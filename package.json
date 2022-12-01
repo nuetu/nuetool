@@ -16,5 +16,9 @@
   "bugs": {
     "url": "https://github.com/nuetu/nuetool/issues"
   },
-  "homepage": "https://github.com/nuetu/nuetool#readme"
+  "homepage": "https://github.com/nuetu/nuetool#readme",
+  "dependencies": {
+    "discord.js": "^14.7.0",
+    "dotenv": "^16.0.3"
+  }
 }
