@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Nuetu's Nuetool - a server management application for switching users into game-specific channels on discord. ",
   "main": "app.js",
-  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -18,7 +17,7 @@
   },
   "homepage": "https://github.com/nuetu/nuetool#readme",
   "dependencies": {
-    "discord.js": "^14.7.0",
+    "discord.js": "^14.7.1",
     "dotenv": "^16.0.3"
   }
 }
