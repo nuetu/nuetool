@@ -26,11 +26,21 @@ const games = {
 };
 /* xxxxxxxxxxxxxxxxxxxx Mutatable constants xxxxxxxxxxxxxxxxxxxx */
 
-const list = {
+const textCommandlist = {
   lucas: "https://chuddy.dev",
   ethan: "EthanElfGamer",
   ben: "Your Captian",
-  help: "To use a command, type out an asterisk before one of the following words:\nhelp - displays command list, although you are already here (meta af)\nlucas - lucas stuff\nethan - alienelf-gainer?\nben - i made this bot, expect something stupid",
+  help: "You used this command to get here, you are either dumb or super meta...",
+};
+
+const actionCommandlist = {
+  botTextChannel: `' ${prefix}botTextChannel <Text Channel Name> 'Use to configure which channel Nuetool sends texts to. Leave blank to set to any channel / whichever channel you called it from.`,
+  setAccess: `' ${prefix}setAdmin <Role> 'Use to set which roles can access Nuetool setup commands. Leave blank for default (Server Owner)`,
+  link: `' ${prefix}link <Game> <Voice Channel Name> 'Link a video game to a specific channel. Users will automatically switch to that channel if they are in a voice channel before they start the game.`,
+  joinToggle: `' ${prefix}joinToggle <true | false> 'Toggle whether users can use the join command to join a server they otherwise would not have access to.`,
+  join: `' ${prefix}join <Voice Channel Name> 'Sends request to users in a targeted voice channel to join. Request is auto approved if no action is taken within 3 minutes.`,
+  yes: `' ${prefix}yes 'Accepts join request to last person to send a request to join voice channel you are currently in.`,
+  no: `' ${prefix}no 'Denies join request to last person to send a request to join voice channel you are currently in`,
 };
 
 // Create a new client instance
@@ -54,53 +64,61 @@ client.on("ready", () => {
 
 //functions when any message is sent
 client.on("messageCreate", (message) => {
-  if (!message.content.startsWith(prefix) || message.author.bot) return;
+  if (!message.content.startsWith(prefix) || message.author.bot) return; //check for texts that start with designated prefix
 
   const args = message.content.slice(prefix.length).split(/ +/);
+  const command = args.shift().toLowerCase(); //returns requested command name
 
-  const command = args.shift().toLowerCase();
-
-  const messageArray = message.content.split(" ");
-  const argument = message.content.slice(1);
-  const cmd = messageArray[0];
-
-  if (command in list) {
-    message.channel.send(list[command]);
+  if (command in textCommandlist || command in actionCommandlist) {
+    runCommand(command, message.channel);
   }
 });
 
-/* client.on("voiceStateUpdate", (oldState, newState) => {
+function runCommand(command, channel) {
+  channel.send(textCommandlist[command]);
+}
+
+//alerts console of user's channel switch
+client.on("voiceStateUpdate", (oldState, newState) => {
+  //if user joined new channel
   if (newState.channelId) {
-    //joined channel
+    // if user moved channel
     if (oldState.channelId !== null) {
-      //moved channel
-      client.channels
-        .fetch("417051296479182859")
-        .then((channel) =>
-          channel.send(
-            `${newState.member.nickname} switched to ${newState.channel.name}!`
-          )
-        );
+      console.log(
+        `${newState.member.nickname} switched to ${newState.channel.name}`
+      );
+    } else {
+      console.log(
+        `${newState.member.nickname} joined ${newState.channel.name}`
+      );
     }
   } else {
-    //if user leaves the channel
+    console.log(`${newState.member.nickname} left ${oldState.channel.name}`);
   }
-}); */
+});
 
 client.on("presenceUpdate", (oldState, newState) => {
   const user = newState.member;
-  if (user.presence.activities.length != 0) {
+  //detects if user is currently in a channel
+  if (user.voice.channel) {
     //user started activity
-    if (user.presence.activities[0].type == ActivityType.Playing) {
-      //user activity is Playing type
-      console.log(
-        `${user.nickname} started playing ${user.presence.activities}`
-      );
-      let newChannel = voiceChannel[user.presence.activities];
-      user.voice.setChannel(newChannel);
+    if (user.presence.activities.length != 0) {
+      //user activity is of "Playing" type
+      if (user.presence.activities[0].type == ActivityType.Playing) {
+        console.log(
+          `${user.nickname} started playing ${user.presence.activities}`
+        );
+        let newChannel = voiceChannel[user.presence.activities];
+        //move user to appropriate channel
+        user.voice.setChannel(newChannel);
+      }
+    } else {
+      //user stops activity
     }
   } else {
-    //user stops activity
+    //user is not currently in a channel
   }
 });
+
+//connects discord bot to nodejs server via bot token
 client.login(token);
