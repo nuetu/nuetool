@@ -7,7 +7,8 @@ const {
   ActivityType,
 } = require(`discord.js`);
 const { token } = require("./config.json");
-const prefix = "*";
+const Sequelize = require("sequelize"); //local database
+const prefix = "$";
 
 /* xxxxxxxxxxxxxxxxxxxx Mutatable constants xxxxxxxxxxxxxxxxxxxx */
 const botCommandsTextChannel = "417051296479182859";
@@ -26,21 +27,18 @@ const games = {
 };
 /* xxxxxxxxxxxxxxxxxxxx Mutatable constants xxxxxxxxxxxxxxxxxxxx */
 
-const textCommandlist = {
-  lucas: "https://chuddy.dev",
-  ethan: "EthanElfGamer",
-  ben: "Your Captian",
-  help: "You used this command to get here, you are either dumb or super meta...",
-};
-
-const actionCommandlist = {
-  botTextChannel: `' ${prefix}botTextChannel <Text Channel Name> 'Use to configure which channel Nuetool sends texts to. Leave blank to set to any channel / whichever channel you called it from.`,
-  setAccess: `' ${prefix}setAdmin <Role> 'Use to set which roles can access Nuetool setup commands. Leave blank for default (Server Owner)`,
-  link: `' ${prefix}link <Game> <Voice Channel Name> 'Link a video game to a specific channel. Users will automatically switch to that channel if they are in a voice channel before they start the game.`,
-  joinToggle: `' ${prefix}joinToggle <true | false> 'Toggle whether users can use the join command to join a server they otherwise would not have access to.`,
-  join: `' ${prefix}join <Voice Channel Name> 'Sends request to users in a targeted voice channel to join. Request is auto approved if no action is taken within 3 minutes.`,
-  yes: `' ${prefix}yes 'Accepts join request to last person to send a request to join voice channel you are currently in.`,
-  no: `' ${prefix}no 'Denies join request to last person to send a request to join voice channel you are currently in`,
+const commandlist = {
+  ethan: `' ${prefix}ethan <noun> '\n    Have the bot call Ethan names`,
+  help: `' ${prefix}help '\n    You used this command to get here, you are either dumb or super meta...`,
+  bottextchannel: `' ${prefix}botTextChannel <Text Channel Name> '\n    Use to configure which channel Nuetool sends texts to.\n    Leave blank to set to any channel / whichever channel you called it from.`,
+  setaccess: `' ${prefix}setAdmin <Role> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for default (Server Owner)`,
+  link: `' ${prefix}link <Game> <Voice Channel Name> '\n    Link a specific video game to a specific channel. \n    Users will automatically switch to that channel if they are in a voice channel before they start the game.\n    Type Game and Voice Channel exactly as is, if either contain multiple words, surround title in quotations " . "\n    You can only link one Voice Channel per game, but multiple games can be linked to the same Voice Channel.`,
+  viewlinks: `' ${prefix}viewLinks '\n    View current Voice Channel and Game links`,
+  removelink: `' ${prefix}removeLink <Game> '\n    Remove Voice Channel link from Game.\n    Type Game exactly as is, if Game contains multiple words, surround in quotations " . "`,
+  jointoggle: `' ${prefix}joinToggle <true | false> '\n    Toggle whether users can use the join command to join a server they otherwise would not have access to.`,
+  join: `' ${prefix}join <Voice Channel Name> '\n    Sends request to users in a targeted voice channel to join.\n    Request is auto approved if no action is taken within 3 minutes.`,
+  yes: `' ${prefix}yes '\n    Accepts join request to last person to send a request to join voice channel you are currently in.`,
+  no: `' ${prefix}no '\n    Denies join request to last person to send a request to join voice channel you are currently in.`,
 };
 
 // Create a new client instance
@@ -60,22 +58,113 @@ client.on("ready", () => {
   client.user.setActivity("Ready to buck some fitches up!", {
     type: ActivityType.Playing,
   });
+  ChannelLinks.sync();
 });
 
-//functions when any message is sent
+const sequelize = new Sequelize("database", "user", "password", {
+  host: "localhost",
+  dialect: "sqlite",
+  logging: false,
+  // SQLite only
+  storage: "database.sqlite",
+});
+
+const ChannelLinks = sequelize.define("tags", {
+  game: {
+    type: Sequelize.STRING,
+    unique: true,
+  },
+  voiceChannel: {
+    type: Sequelize.STRING,
+    allowNull: false,
+  },
+});
+
+async function addLink(channel, game, voice) {
+  try {
+    // equivalent to: INSERT INTO tags (name, description, username) values (?, ?, ?);
+    const link = await ChannelLinks.create({
+      game: game,
+      voiceChannel: voice,
+    });
+    channel.send(`Link ${link.game} -> ${link.voiceChannel} added.`);
+  } catch (error) {
+    if (error.game === "SequelizeUniqueConstraintError") {
+      channel.send("That game is already connected to a Voice Channel.");
+    } else if (error.voiceChannel === "SequelizeUniqueConstraintError") {
+      channel.send("That Voice Channel is already connected to a game.");
+    }
+    channel.send("Something went wrong with adding a link.");
+  }
+}
+
+async function viewLink(channel) {
+  const links = await ChannelLinks.findAll();
+  const tagString =
+    links
+      .map((l) => `Game: "${l.game}" -> Voice Channel: "${l.voiceChannel}"`)
+      .join("\n") || "No Links set.";
+  channel.send(tagString);
+  console.log(tagString);
+}
+
+async function removeLink(channel, name) {
+  const remove = await ChannelLinks.destroy({ where: { game: name } });
+  if (!remove) {
+    channel.send(`No valid game link under the game "${name}"`);
+  } else {
+    channel.send(`Removed ${name} link`);
+  }
+}
+
+//functions when any message is sent, filters for commands, runs command.
 client.on("messageCreate", (message) => {
   if (!message.content.startsWith(prefix) || message.author.bot) return; //check for texts that start with designated prefix
-
-  const args = message.content.slice(prefix.length).split(/ +/);
+  const regex = /"[^"]+"|[^\s]+/g;
+  const args = message.content
+    .slice(prefix.length)
+    .match(regex)
+    .map((e) => e.replace(/"(.+)"/, "$1")); //returns array of arguments, const command removes command from argument array
   const command = args.shift().toLowerCase(); //returns requested command name
-
-  if (command in textCommandlist || command in actionCommandlist) {
-    runCommand(command, message.channel);
+  if (command in commandlist) {
+    runCommand(command, args, message.channel);
+  } else {
+    console.log("Invalid Command");
+    message.channel.send(
+      `Invalid Command! Please type " ${prefix}help " for help :)`
+    );
   }
 });
 
-function runCommand(command, channel) {
-  channel.send(textCommandlist[command]);
+//runs commands.
+function runCommand(command, args, channel) {
+  switch (command) {
+    case "help":
+      var output = "Available commands list:\n";
+      for (let key in textCommandlist) {
+        output += `**${key}**: ${textCommandlist[key]}\n`;
+      }
+      for (let key in actionCommandlist) {
+        output += `**${key}**: ${actionCommandlist[key]}\n`;
+      }
+      channel.send(output);
+      break;
+    case "link":
+      addLink(channel, args[0], args[1]);
+      console.log("command link called");
+      break;
+    case "viewlinks":
+      viewLink(channel);
+      console.log("command viewlinks called");
+      break;
+    case "removelink":
+      removeLink(channel, args[0]);
+      console.log("command removelink called");
+      break;
+    case "ethan":
+      channel.send(`Ethan is a ${args.join(" ")}`);
+      break;
+  }
 }
 
 //alerts console of user's channel switch

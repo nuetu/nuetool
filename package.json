@@ -18,6 +18,8 @@
   "homepage": "https://github.com/nuetu/nuetool#readme",
   "dependencies": {
     "discord.js": "^14.7.1",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "sequelize": "^6.26.0",
+    "sqlite3": "^5.1.2"
   }
 }
