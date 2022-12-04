@@ -23,9 +23,9 @@ const commandlist = {
   //yes: `' ${prefix}yes '\n    Accepts join request to last person to send a request to join voice channel you are currently in.`,
   //no: `' ${prefix}no '\n    Denies join request to last person to send a request to join voice channel you are currently in.`,
   bottextchannel: `' ${prefix}botTextChannel <Text Channel ID> '\n    Use to configure which channel Nuetool sends texts to.\n    Leave blank to set to any channel / whichever channel you called it from.`,
-  //setaccess: `' ${prefix}setAdmin <Role> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for default (Server Owner)`,
-  botdetails: `Bot Details`,
-  initialize: `CAUTION: WILL RESET SERVER BOT (Links will not be removed)`,
+  setaccess: `' ${prefix}setAdmin <Role ID> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for any.\n    Copy Role ID from Server Settings > Roles`,
+  botdetails: `' ${prefix}botDetails '\n    Bot Details`,
+  initialize: `' ${prefix}initialize '\n    CAUTION: WILL RESET SERVER BOT (Links will not be removed)`,
 };
 
 // Create a new client instance
@@ -88,6 +88,11 @@ const ServerDetails = sequelize.define("guilds", {
     allowNull: true,
     default: null,
   },
+  botAccessRole: {
+    type: Sequelize.STRING,
+    allowNull: true,
+    default: null,
+  },
 });
 
 //initialize server database
@@ -98,6 +103,7 @@ async function initializeServer() {
       serverId: guildId,
       joinToggle: true,
       botTextChannel: null,
+      botAccessRole: null,
     });
   }
 }
@@ -110,10 +116,26 @@ async function adminChannel(channel) {
   return channel;
 }
 
+async function adminCommand(message) {
+  const server = await ServerDetails.findOne({ where: { serverId: guildId } });
+  if (
+    message.member.roles.cache.has(server.botAccessRole) ||
+    server.botAccessRole == null
+  ) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 //function called when command "link" is called in server chat. Adds link to the link database
-async function addLink(channel, game, voice) {
-  channel = await adminChannel(channel);
+async function addLink(message, game, voice) {
+  const admin = await adminCommand(message);
   try {
+    if (!admin) {
+      throw "notAnAdmin";
+    }
+    channel = await adminChannel(message.channel);
     if (isNaN(parseInt(voice))) {
       throw "notANumber";
     }
@@ -130,6 +152,8 @@ async function addLink(channel, game, voice) {
       channel.send(
         "Right click on your designated Voice Channel and select 'Copy ID', then paste that after your Game name."
       );
+    } else if (error === "notAnAdmin") {
+      channel.send("This command requires Admin privilieges.");
     } else {
       channel.send(
         `Something went wrong with adding a link.\n${prefix}link <Game Name> <Voice Channel ID>`
@@ -139,63 +163,97 @@ async function addLink(channel, game, voice) {
 }
 
 //function called when command "viewlinks" is called in server chat. Displays all links in link database.
-async function viewLink(channel) {
-  channel = await adminChannel(channel);
-  const links = await ChannelLinks.findAll();
-  if (links.length > 0) {
-    var tagString = "";
-    for (let i in links) {
-      tagString += `Game: "${
-        links[i].game
-      }" -> Voice Channel: "${client.channels.cache.get(
-        links[i].voiceChannel
-      )}"\n`;
+async function viewLink(message) {
+  const admin = await adminCommand(message);
+  try {
+    if (!admin) {
+      throw "notAnAdmin";
     }
-    channel.send(tagString);
-    if (DEBUG_MODE) {
-      console.log(tagString);
+    channel = await adminChannel(message.channel);
+    const links = await ChannelLinks.findAll();
+    if (links.length > 0) {
+      var tagString = "";
+      for (let i in links) {
+        tagString += `Game: "${
+          links[i].game
+        }" -> Voice Channel: "${client.channels.cache.get(
+          links[i].voiceChannel
+        )}"\n`;
+      }
+      channel.send(tagString);
+      if (DEBUG_MODE) {
+        console.log(tagString);
+      }
+    } else {
+      channel.send(
+        `No active links. To set one up, use command '${prefix}link <Game> <Voice Channel ID>'`
+      );
     }
-  } else {
-    channel.send(
-      `No active links. To set one up, use command '${prefix}link <Game> <Voice Channel ID>'`
-    );
+  } catch (error) {
+    if (error === "notAnAdmin") {
+      message.channel.send("This command requires Admin privilieges.");
+    }
   }
 }
 
 //function called when command "removelink" is called in server chat. Removes links from link database
-async function removeLink(channel, name) {
-  channel = await adminChannel(channel);
-  const remove = await ChannelLinks.destroy({ where: { game: name } });
-  if (!remove) {
-    channel.send(`No valid game link under the game "${name}"`);
-  } else {
-    channel.send(`Removed ${name} link`);
+async function removeLink(message, name) {
+  const admin = await adminCommand(message);
+  try {
+    if (!admin) {
+      throw "notAnAdmin";
+    }
+    channel = await adminChannel(message.channel);
+    const remove = await ChannelLinks.destroy({ where: { game: name } });
+    if (!remove) {
+      channel.send(`No valid game link under the game "${name}"`);
+    } else {
+      channel.send(`Removed ${name} link`);
+    }
+  } catch (error) {
+    if (error === "notAnAdmin") {
+      message.channel.send("This command requires Admin privilieges.");
+    }
   }
 }
 
 //function called when command "joinToggle" is called in server chat
-async function joinToggle(channel, bool) {
-  channel = await adminChannel(channel);
-  const update = await ServerDetails.update(
-    { joinToggle: bool },
-    { where: { serverId: guildId } }
-  );
-  if (update > 0) {
-    channel.send(
-      `joinToggle is now ${bool}. AKA Users can use the ${prefix}join command = ${bool}`
+async function joinToggle(message, bool) {
+  const admin = await adminCommand(message);
+  try {
+    if (!admin) {
+      throw "notAnAdmin";
+    }
+    channel = await adminChannel(message.channel);
+    const update = await ServerDetails.update(
+      { joinToggle: bool },
+      { where: { serverId: guildId } }
     );
-  } else {
-    channel.send("something went wrong, contact dev.");
+    if (update > 0) {
+      channel.send(
+        `joinToggle is now ${bool}. AKA Users can use the ${prefix}join command = ${bool}`
+      );
+    } else {
+      channel.send("something went wrong, contact dev.");
+    }
+  } catch (error) {
+    if (error === "notAnAdmin") {
+      message.channel.send("This command requires Admin privilieges.");
+    }
   }
 }
 
 //function called when command "bottextchannel" is called in server chat
-async function setBotTextChannel(channel, textChannel) {
-  channel = await adminChannel(channel);
-  if (!textChannel) {
-    textChannel = null;
-  }
+async function setBotTextChannel(message, textChannel) {
+  const admin = await adminCommand(message);
   try {
+    if (!admin) {
+      throw "notAnAdmin";
+    }
+    channel = await adminChannel(message.channel);
+    if (!textChannel) {
+      textChannel = null;
+    }
     if (isNaN(parseInt(textChannel)) && textChannel != null) {
       throw "notANumber";
     }
@@ -212,7 +270,11 @@ async function setBotTextChannel(channel, textChannel) {
     }
   } catch (error) {
     if (error === "notANumber") {
-      channel.send("Right click on the designated text channel ID and copy ID");
+      message.channel.send(
+        "Right click on the designated text channel ID and copy ID"
+      );
+    } else if (error === "notAnAdmin") {
+      message.channel.send("This command requires Admin privilieges.");
     } else {
       if (DEBUG_MODE) {
         console.log(error);
@@ -221,13 +283,62 @@ async function setBotTextChannel(channel, textChannel) {
   }
 }
 
-async function botDeatils(channel) {
-  channel = await adminChannel(channel);
-  const links = await ChannelLinks.findAll();
-  const server = await ServerDetails.findOne({ where: { serverId: guildId } });
-  channel.send(
-    `Total links: ${links.length}\n Join Toggle: ${server.joinToggle}\n Bot Channel: ${server.botTextChannel}`
-  );
+async function setBotAccessRole(message, roleID) {
+  const admin = await adminCommand(message);
+  try {
+    if (!admin) {
+      throw "notAnAdmin";
+    }
+    channel = await adminChannel(message.channel);
+    if (!roleID) {
+      roleID = null;
+    }
+    if (isNaN(parseInt(roleID)) && roleID != null) {
+      throw "notANumber";
+    }
+    const update = await ServerDetails.update(
+      { botAccessRole: roleID },
+      { where: { serverId: guildId } }
+    );
+    if (update > 0) {
+      channel.send(
+        `Primary access to bot setup commands is now set to ${roleID}`
+      );
+    } else {
+      channel.send("something went wrong, contact dev.");
+    }
+  } catch (error) {
+    if (error === "notANumber") {
+      message.channel.send("Copy the Role ID from Settings > Roles");
+    } else if (error === "notAnAdmin") {
+      message.channel.send("This command requires Admin privilieges.");
+    } else {
+      if (DEBUG_MODE) {
+        console.log(error);
+      }
+    }
+  }
+}
+
+async function botDeatils(message) {
+  const admin = await adminCommand(message);
+  try {
+    if (!admin) {
+      throw "notAnAdmin";
+    }
+    channel = await adminChannel(message.channel);
+    const links = await ChannelLinks.findAll();
+    const server = await ServerDetails.findOne({
+      where: { serverId: guildId },
+    });
+    channel.send(
+      `Total links: ${links.length}\n Join Toggle: ${server.joinToggle}\n Bot Channel: ${server.botTextChannel}\n Access Role: ${server.botAccessRole}`
+    );
+  } catch (error) {
+    if (error === "notAnAdmin") {
+      message.channel.send("This command requires Admin privilieges.");
+    }
+  }
 }
 
 //functions when any message is sent, filters for commands, sends to runCommand function, returns invalid command if command isn't recgonized .
@@ -240,7 +351,7 @@ client.on("messageCreate", (message) => {
     .map((e) => e.replace(/"(.+)"/, "$1")); //returns array of arguments, const command removes command from argument array
   const command = args.shift().toLowerCase(); //returns requested command name
   if (command in commandlist) {
-    runCommand(command, args, message.channel);
+    runCommand(command, args, message);
   } else {
     if (DEBUG_MODE) {
       console.log("Invalid Command");
@@ -252,7 +363,8 @@ client.on("messageCreate", (message) => {
 });
 
 //runs commands.
-function runCommand(command, args, channel) {
+function runCommand(command, args, message) {
+  const channel = message.channel;
   switch (command) {
     case "ethan":
       channel.send(`Ethan is a ${args.join(" ")}`);
@@ -265,40 +377,40 @@ function runCommand(command, args, channel) {
       for (let key in commandlist) {
         output += `**${key}**: ${commandlist[key]}\n`;
       }
-      channel.send(output);
+      message.author.send(output);
       if (DEBUG_MODE) {
         console.log("command 'help' called");
       }
       break;
     case "link":
-      addLink(channel, args[0], args[1]);
+      addLink(message, args[0], args[1]);
       if (DEBUG_MODE) {
         console.log("command 'link' called");
       }
 
       break;
     case "viewlinks":
-      viewLink(channel);
+      viewLink(message);
       if (DEBUG_MODE) {
         console.log("command 'viewlinks' called");
       }
 
       break;
     case "removelink":
-      removeLink(channel, args[0]);
+      removeLink(message, args[0]);
       if (DEBUG_MODE) {
         console.log("command 'removelink' called");
       }
 
       break;
     case "jointoggle":
-      joinToggle(channel, args[0]);
+      joinToggle(message, args[0]);
       if (DEBUG_MODE) {
         console.log("command 'jointoggle' called");
       }
       break;
     case "bottextchannel":
-      setBotTextChannel(channel, args[0]);
+      setBotTextChannel(message, args[0]);
       if (DEBUG_MODE) {
         console.log("command 'bottextchannel' called");
       }
@@ -319,6 +431,7 @@ function runCommand(command, args, channel) {
       }
       break;
     case "setaccess":
+      setBotAccessRole(message, args[0]);
       if (DEBUG_MODE) {
         console.log("command 'setaccess' called");
       }
@@ -327,7 +440,7 @@ function runCommand(command, args, channel) {
       if (DEBUG_MODE) {
         console.log("command 'botdetails' called");
       }
-      botDeatils(channel);
+      botDeatils(message);
       break;
     case "initialize":
       if (DEBUG_MODE) {
