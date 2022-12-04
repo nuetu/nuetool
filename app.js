@@ -10,29 +10,12 @@ const { token } = require("./config.json");
 const Sequelize = require("sequelize"); //local database
 const prefix = "$";
 
-/* xxxxxxxxxxxxxxxxxxxx Mutatable constants xxxxxxxxxxxxxxxxxxxx */
-const botCommandsTextChannel = "417051296479182859";
-const voiceChannel = {
-  Fortnite: "749072919329636442",
-  "Rocket League": "816850966401908758",
-  "Grand Theft Auto": "816851523299835954",
-  Minecraft: "817082193897717821",
-  Wizard101: "817081411805773855",
-  "Codey-boys": "1027025370530185297",
-  "The Closet": "816852787862044672",
-  General: "690735847108116491",
-};
-const games = {
-  Wizard101: "",
-};
-/* xxxxxxxxxxxxxxxxxxxx Mutatable constants xxxxxxxxxxxxxxxxxxxx */
-
 const commandlist = {
   ethan: `' ${prefix}ethan <noun> '\n    Have the bot call Ethan names`,
   help: `' ${prefix}help '\n    You used this command to get here, you are either dumb or super meta...`,
   bottextchannel: `' ${prefix}botTextChannel <Text Channel Name> '\n    Use to configure which channel Nuetool sends texts to.\n    Leave blank to set to any channel / whichever channel you called it from.`,
   setaccess: `' ${prefix}setAdmin <Role> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for default (Server Owner)`,
-  link: `' ${prefix}link <Game> <Voice Channel Name> '\n    Link a specific video game to a specific channel. \n    Users will automatically switch to that channel if they are in a voice channel before they start the game.\n    Type Game and Voice Channel exactly as is, if either contain multiple words, surround title in quotations " . "\n    You can only link one Voice Channel per game, but multiple games can be linked to the same Voice Channel.`,
+  link: `' ${prefix}link <Game> <Voice Channel ID> '\n    Link a specific video game to a specific channel. \n    Users will automatically switch to that channel if they are in a voice channel before they start the game.\n    Type Game and Voice Channel Id exactly as is, if Game contains multiple words, surround title in quotations " . "\n    You can only link one Voice Channel per game, but multiple games can be linked to the same Voice Channel.\n    Right click voice channel and click "Copy ID" to find Voice Channel ID`,
   viewlinks: `' ${prefix}viewLinks '\n    View current Voice Channel and Game links`,
   removelink: `' ${prefix}removeLink <Game> '\n    Remove Voice Channel link from Game.\n    Type Game exactly as is, if Game contains multiple words, surround in quotations " . "`,
   jointoggle: `' ${prefix}joinToggle <true | false> '\n    Toggle whether users can use the join command to join a server they otherwise would not have access to.`,
@@ -75,35 +58,43 @@ const ChannelLinks = sequelize.define("tags", {
     unique: true,
   },
   voiceChannel: {
-    type: Sequelize.STRING,
+    type: Sequelize.INTEGER,
     allowNull: false,
   },
 });
 
 async function addLink(channel, game, voice) {
   try {
-    // equivalent to: INSERT INTO tags (name, description, username) values (?, ?, ?);
+    if (isNaN(parseInt(voice))) {
+      throw "Voice Channel must be a number ID!";
+    }
     const link = await ChannelLinks.create({
       game: game,
       voiceChannel: voice,
     });
-    channel.send(`Link ${link.game} -> ${link.voiceChannel} added.`);
+    const voiceChannel = client.channels.cache.get(link.voiceChannel);
+    channel.send(`Link ${link.game} -> ${voiceChannel.name} added.`);
   } catch (error) {
     if (error.game === "SequelizeUniqueConstraintError") {
       channel.send("That game is already connected to a Voice Channel.");
-    } else if (error.voiceChannel === "SequelizeUniqueConstraintError") {
+    } else if (error.voiceChannel === "") {
       channel.send("That Voice Channel is already connected to a game.");
     }
     channel.send("Something went wrong with adding a link.");
+    console.error(error);
   }
 }
 
 async function viewLink(channel) {
   const links = await ChannelLinks.findAll();
-  const tagString =
-    links
-      .map((l) => `Game: "${l.game}" -> Voice Channel: "${l.voiceChannel}"`)
-      .join("\n") || "No Links set.";
+  var tagString = "";
+  for (let i in links) {
+    tagString += `Game: "${
+      links[i].game
+    }" -> Voice Channel: "${client.channels.cache.get(
+      links[i].voiceChannel
+    )}"\n`;
+  }
   channel.send(tagString);
   console.log(tagString);
 }
@@ -151,15 +142,15 @@ function runCommand(command, args, channel) {
       break;
     case "link":
       addLink(channel, args[0], args[1]);
-      console.log("command link called");
+      console.log("command 'link' called");
       break;
     case "viewlinks":
       viewLink(channel);
-      console.log("command viewlinks called");
+      console.log("command 'viewlinks' called");
       break;
     case "removelink":
       removeLink(channel, args[0]);
-      console.log("command removelink called");
+      console.log("command 'removelink' called");
       break;
     case "ethan":
       channel.send(`Ethan is a ${args.join(" ")}`);
@@ -186,7 +177,7 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   }
 });
 
-client.on("presenceUpdate", (oldState, newState) => {
+client.on("presenceUpdate", async (oldState, newState) => {
   const user = newState.member;
   //detects if user is currently in a channel
   if (user.voice.channel) {
@@ -194,12 +185,14 @@ client.on("presenceUpdate", (oldState, newState) => {
     if (user.presence.activities.length != 0) {
       //user activity is of "Playing" type
       if (user.presence.activities[0].type == ActivityType.Playing) {
-        console.log(
-          `${user.nickname} started playing ${user.presence.activities}`
-        );
-        let newChannel = voiceChannel[user.presence.activities];
+        var gameName = user.presence.activities.toString();
+        console.log(`${user.nickname} started playing ${gameName}`);
         //move user to appropriate channel
-        user.voice.setChannel(newChannel);
+        const link = await ChannelLinks.findOne({ where: { game: gameName } });
+        if (link) {
+          console.log("Link request channel");
+          user.voice.setChannel(link.voiceChannel);
+        }
       }
     } else {
       //user stops activity
