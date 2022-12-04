@@ -9,6 +9,8 @@ const {
 const { token, guildId } = require("./config.json");
 const Sequelize = require("sequelize"); //local database
 const prefix = "$";
+const DEBUG_MODE = false;
+const SHOW_UPDATES = false;
 
 const commandlist = {
   ethan: `' ${prefix}ethan <noun> '\n    Have the bot call Ethan names`,
@@ -17,11 +19,11 @@ const commandlist = {
   viewlinks: `' ${prefix}viewLinks '\n    View current Voice Channel and Game links`,
   removelink: `' ${prefix}removeLink <Game> '\n    Remove Voice Channel link from Game.\n    Type Game exactly as is, if Game contains multiple words, surround in quotations " . "`,
   jointoggle: `' ${prefix}joinToggle <true | false> '\n    Toggle whether users can use the join command to join a server they otherwise would not have access to.`,
-  join: `' ${prefix}join <Voice Channel Name> '\n    Sends request to users in a targeted voice channel to join.\n    Request is auto approved if no action is taken within 3 minutes.`,
-  yes: `' ${prefix}yes '\n    Accepts join request to last person to send a request to join voice channel you are currently in.`,
-  no: `' ${prefix}no '\n    Denies join request to last person to send a request to join voice channel you are currently in.`,
+  //join: `' ${prefix}join <Voice Channel Name> '\n    Sends request to users in a targeted voice channel to join.\n    Request is auto approved if no action is taken within 3 minutes.`,
+  //yes: `' ${prefix}yes '\n    Accepts join request to last person to send a request to join voice channel you are currently in.`,
+  //no: `' ${prefix}no '\n    Denies join request to last person to send a request to join voice channel you are currently in.`,
   bottextchannel: `' ${prefix}botTextChannel <Text Channel ID> '\n    Use to configure which channel Nuetool sends texts to.\n    Leave blank to set to any channel / whichever channel you called it from.`,
-  setaccess: `' ${prefix}setAdmin <Role> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for default (Server Owner)`,
+  //setaccess: `' ${prefix}setAdmin <Role> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for default (Server Owner)`,
   botdetails: `Bot Details`,
   initialize: `CAUTION: WILL RESET SERVER BOT (Links will not be removed)`,
 };
@@ -40,7 +42,9 @@ const client = new Client({
 
 //When bot first connects
 client.on("ready", () => {
-  console.log("Bot is moovin and groovin");
+  if (DEBUG_MODE || SHOW_UPDATES) {
+    console.log("Bot is moovin and groovin");
+  }
   client.user.setActivity("Ready to buck some fitches up!", {
     type: ActivityType.Playing,
   });
@@ -64,7 +68,7 @@ const ChannelLinks = sequelize.define("links", {
     unique: true,
   },
   voiceChannel: {
-    type: Sequelize.INTEGER,
+    type: Sequelize.STRING,
     allowNull: false,
   },
 });
@@ -138,16 +142,24 @@ async function addLink(channel, game, voice) {
 async function viewLink(channel) {
   channel = await adminChannel(channel);
   const links = await ChannelLinks.findAll();
-  var tagString = "";
-  for (let i in links) {
-    tagString += `Game: "${
-      links[i].game
-    }" -> Voice Channel: "${client.channels.cache.get(
-      links[i].voiceChannel
-    )}"\n`;
+  if (links.length > 0) {
+    var tagString = "";
+    for (let i in links) {
+      tagString += `Game: "${
+        links[i].game
+      }" -> Voice Channel: "${client.channels.cache.get(
+        links[i].voiceChannel
+      )}"\n`;
+    }
+    channel.send(tagString);
+    if (DEBUG_MODE) {
+      console.log(tagString);
+    }
+  } else {
+    channel.send(
+      `No active links. To set one up, use command '${prefix}link <Game> <Voice Channel ID>'`
+    );
   }
-  channel.send(tagString);
-  console.log(tagString);
 }
 
 //function called when command "removelink" is called in server chat. Removes links from link database
@@ -202,7 +214,9 @@ async function setBotTextChannel(channel, textChannel) {
     if (error === "notANumber") {
       channel.send("Right click on the designated text channel ID and copy ID");
     } else {
-      console.log(error);
+      if (DEBUG_MODE) {
+        console.log(error);
+      }
     }
   }
 }
@@ -228,7 +242,9 @@ client.on("messageCreate", (message) => {
   if (command in commandlist) {
     runCommand(command, args, message.channel);
   } else {
-    console.log("Invalid Command");
+    if (DEBUG_MODE) {
+      console.log("Invalid Command");
+    }
     message.channel.send(
       `Invalid Command! Please type " ${prefix}help " for help :)`
     );
@@ -240,6 +256,9 @@ function runCommand(command, args, channel) {
   switch (command) {
     case "ethan":
       channel.send(`Ethan is a ${args.join(" ")}`);
+      if (DEBUG_MODE) {
+        console.log("command 'ethan' called");
+      }
       break;
     case "help":
       var output = "Available commands list:\n";
@@ -247,45 +266,82 @@ function runCommand(command, args, channel) {
         output += `**${key}**: ${commandlist[key]}\n`;
       }
       channel.send(output);
+      if (DEBUG_MODE) {
+        console.log("command 'help' called");
+      }
       break;
     case "link":
       addLink(channel, args[0], args[1]);
-      console.log("command 'link' called");
+      if (DEBUG_MODE) {
+        console.log("command 'link' called");
+      }
+
       break;
     case "viewlinks":
       viewLink(channel);
-      console.log("command 'viewlinks' called");
+      if (DEBUG_MODE) {
+        console.log("command 'viewlinks' called");
+      }
+
       break;
     case "removelink":
       removeLink(channel, args[0]);
-      console.log("command 'removelink' called");
+      if (DEBUG_MODE) {
+        console.log("command 'removelink' called");
+      }
+
       break;
     case "jointoggle":
       joinToggle(channel, args[0]);
+      if (DEBUG_MODE) {
+        console.log("command 'jointoggle' called");
+      }
       break;
     case "bottextchannel":
       setBotTextChannel(channel, args[0]);
+      if (DEBUG_MODE) {
+        console.log("command 'bottextchannel' called");
+      }
       break;
     case "join":
+      if (DEBUG_MODE) {
+        console.log("command 'join' called");
+      }
       break;
     case "yes":
+      if (DEBUG_MODE) {
+        console.log("command 'yes' called");
+      }
       break;
     case "no":
+      if (DEBUG_MODE) {
+        console.log("command 'no' called");
+      }
       break;
     case "setaccess":
+      if (DEBUG_MODE) {
+        console.log("command 'setaccess' called");
+      }
       break;
     case "botdetails":
+      if (DEBUG_MODE) {
+        console.log("command 'botdetails' called");
+      }
       botDeatils(channel);
       break;
     case "initialize":
+      if (DEBUG_MODE) {
+        console.log("command 'initialize' called");
+      }
       initializeServer();
+      break;
   }
 }
 
 //alerts console of user's channel switch, mostly useful for debugging
 client.on("voiceStateUpdate", (oldState, newState) => {
   //if user joined new channel
-  if (newState.channelId) {
+  if (newState.channelId && (DEBUG_MODE || SHOW_UPDATES)) {
     // if user moved channel
     if (oldState.channelId !== null) {
       console.log(
@@ -315,8 +371,12 @@ client.on("presenceUpdate", async (oldState, newState) => {
         //move user to appropriate channel
         const link = await ChannelLinks.findOne({ where: { game: gameName } });
         if (link) {
-          console.log("Link request channel");
           user.voice.setChannel(link.voiceChannel);
+          if (DEBUG_MODE) {
+            console.log(
+              `Nuetools moved ${user.nickname} to ${user.voiceChannel}`
+            );
+          }
         }
       }
     } else {
