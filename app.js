@@ -15,6 +15,7 @@ const commandlist = {
   bottextchannel: `' ${prefix}botTextChannel <Text Channel ID> '\n    Use to configure which channel Nuetool sends texts to.\n    Leave blank to set to any channel / whichever channel you called it from.`,
   botdetails: `' ${prefix}botDetails '\n    Bot Details`,
   initialize: `' ${prefix}initialize '\n    CAUTION: WILL RESET SERVER BOT (Links will not be removed)`,
+  setaccess: `' ${prefix}setAccess <Role ID>'\n    Use to set which roles can access Nuetool setup commands. Leave blank for any. Copy Role ID from Server Settings > Roles`,
 };
 
 // Create a new client instance

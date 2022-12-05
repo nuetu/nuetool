@@ -2,6 +2,8 @@
 
 ** Nuetu's Nuetool **- a server management application for switching users into specific voice-limited channels on discord.
 
+**_ Currently in Develoment. To use properly, you must turn on "Developer Mode" in Discord - User Settings > Advanced > Developer Mode _**
+
 Packages installed:
 
 Node.js `npm install node`
