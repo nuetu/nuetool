@@ -1,11 +1,4 @@
-const {
-  Client,
-  GatewayIntentBits,
-  EmbedBuilder,
-  PermissionsBitField,
-  Permissions,
-  ActivityType,
-} = require(`discord.js`);
+const { Client, GatewayIntentBits, ActivityType } = require(`discord.js`);
 const { token, guildId } = require("./config.json");
 const Sequelize = require("sequelize"); //local database
 const prefix = "$";
@@ -18,12 +11,8 @@ const commandlist = {
   link: `' ${prefix}link <Game> <Voice Channel ID> '\n    Link a specific video game to a specific channel. \n    Users will automatically switch to that channel if they are in a voice channel before they start the game.\n    Type Game and Voice Channel Id exactly as is, if Game contains multiple words, surround title in quotations " . "\n    You can only link one Voice Channel per game, but multiple games can be linked to the same Voice Channel.\n    Right click voice channel and click "Copy ID" to find Voice Channel ID`,
   viewlinks: `' ${prefix}viewLinks '\n    View current Voice Channel and Game links`,
   removelink: `' ${prefix}removeLink <Game> '\n    Remove Voice Channel link from Game.\n    Type Game exactly as is, if Game contains multiple words, surround in quotations " . "`,
-  jointoggle: `' ${prefix}joinToggle <true | false> '\n    Toggle whether users can use the join command to join a server they otherwise would not have access to.`,
-  //join: `' ${prefix}join <Voice Channel Name> '\n    Sends request to users in a targeted voice channel to join.\n    Request is auto approved if no action is taken within 3 minutes.`,
-  //yes: `' ${prefix}yes '\n    Accepts join request to last person to send a request to join voice channel you are currently in.`,
-  //no: `' ${prefix}no '\n    Denies join request to last person to send a request to join voice channel you are currently in.`,
+  jointoggle: `' ${prefix}joinToggle <true | false> '\n    Toggle whether users can use the join command to join a server they otherwise would not have access to. Currently Innavtive`,
   bottextchannel: `' ${prefix}botTextChannel <Text Channel ID> '\n    Use to configure which channel Nuetool sends texts to.\n    Leave blank to set to any channel / whichever channel you called it from.`,
-  setaccess: `' ${prefix}setAdmin <Role ID> '\n    Use to set which roles can access Nuetool setup commands.\n    Leave blank for any.\n    Copy Role ID from Server Settings > Roles`,
   botdetails: `' ${prefix}botDetails '\n    Bot Details`,
   initialize: `' ${prefix}initialize '\n    CAUTION: WILL RESET SERVER BOT (Links will not be removed)`,
 };
@@ -415,26 +404,11 @@ function runCommand(command, args, message) {
         console.log("command 'bottextchannel' called");
       }
       break;
-    case "join":
-      if (DEBUG_MODE) {
-        console.log("command 'join' called");
-      }
-      break;
-    case "yes":
-      if (DEBUG_MODE) {
-        console.log("command 'yes' called");
-      }
-      break;
-    case "no":
-      if (DEBUG_MODE) {
-        console.log("command 'no' called");
-      }
-      break;
     case "setaccess":
-      setBotAccessRole(message, args[0]);
       if (DEBUG_MODE) {
         console.log("command 'setaccess' called");
       }
+      setBotAccessRole(message, args[0]);
       break;
     case "botdetails":
       if (DEBUG_MODE) {
@@ -466,7 +440,9 @@ client.on("voiceStateUpdate", (oldState, newState) => {
       );
     }
   } else {
-    console.log(`${newState.member.nickname} left ${oldState.channel.name}`);
+    if (DEBUG_MODE || SHOW_UPDATES) {
+      console.log(`${newState.member.nickname} left ${oldState.channel.name}`);
+    }
   }
 });
 
